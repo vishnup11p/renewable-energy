@@ -423,5 +423,5 @@ def login_endpoint():
         return jsonify({'success': True, 'token': 'demo-token'})
     return jsonify({'success': False}), 401
 
-# Export app for Vercel
-# Vercel will automatically detect Flask app
+# Export Flask app for Vercel
+# Vercel automatically detects Flask apps when 'app' is exported
