@@ -42,7 +42,6 @@ const Reports = () => {
 
   const totalSolar = monthlyData.reduce((sum, d) => sum + d.solar, 0);
   const totalWind = monthlyData.reduce((sum, d) => sum + d.wind, 0);
-  const totalConsumption = monthlyData.reduce((sum, d) => sum + d.consumption, 0);
   const totalGeneration = totalSolar + totalWind;
   const savings = totalGeneration * 8;
   const co2Saved = totalGeneration * 0.92;
