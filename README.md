@@ -15,43 +15,51 @@ Smart Renewable Energy Optimization & Monitoring Dashboard with real-time weathe
 ## Tech Stack
 
 - **Frontend**: React.js, Chart.js, Tailwind CSS
-- **Backend**: Flask, SQLAlchemy, SQLite
+- **Backend**: Flask (Python), Serverless Functions
 - **Weather API**: Open-Meteo (Free, no API key required)
+- **Hosting**: Vercel (Full-stack deployment)
 
-## Deployment
+## Deployment to Vercel
 
-### Frontend (Vercel)
+### Prerequisites
+- GitHub account
+- Vercel account (free tier works)
 
-1. Install Vercel CLI:
-   ```bash
-   npm i -g vercel
-   ```
+### Steps
 
-2. Navigate to project root and deploy:
-   ```bash
-   vercel
-   ```
+1. **Push code to GitHub** (already done ✅)
 
-3. Set environment variable in Vercel dashboard:
-   - `REACT_APP_API_URL` = Your backend API URL (e.g., `https://your-backend.railway.app`)
+2. **Deploy to Vercel**:
+   - Go to [vercel.com](https://vercel.com)
+   - Click "Add New Project"
+   - Import repository: `vishnup11p/renewable-energy`
+   - Configure:
+     - **Framework Preset**: Other
+     - **Root Directory**: Leave blank (or set to root)
+     - **Build Command**: `cd frontend && npm install && npm run build`
+     - **Output Directory**: `frontend/build`
+   - Click "Deploy"
 
-### Backend (Railway/Render)
+3. **Vercel will automatically**:
+   - Detect Python API in `api/` directory
+   - Build React frontend
+   - Deploy both frontend and backend together
 
-The Flask backend should be deployed separately on Railway, Render, or similar platform:
+4. **No environment variables needed** - API uses relative URLs in production
 
-1. **Railway**:
-   - Connect your GitHub repo
-   - Set root directory to `backend`
-   - Add environment variables if needed
-   - Railway will auto-detect Python and install dependencies
+### How It Works
 
-2. **Render**:
-   - Create a new Web Service
-   - Set root directory to `backend`
-   - Build command: `pip install -r requirements.txt`
-   - Start command: `python app.py`
+- **Frontend**: Served as static files from `frontend/build`
+- **Backend**: Flask app in `api/index.py` runs as serverless functions
+- **API Routes**: All `/api/*` requests are routed to Python serverless functions
+- **Storage**: In-memory (resets on cold start - suitable for demo)
 
-3. Update frontend environment variable `REACT_APP_API_URL` with your backend URL
+### Note on Data Persistence
+
+The current implementation uses in-memory storage which resets on serverless function cold starts. For production with persistent data, consider:
+- Vercel Postgres (recommended)
+- Vercel KV (Redis)
+- External database (Supabase, PlanetScale, etc.)
 
 ## Local Development
 
@@ -69,9 +77,21 @@ npm install
 npm start
 ```
 
-## Environment Variables
+## Project Structure
 
-- `REACT_APP_API_URL`: Backend API URL (default: `http://localhost:5000`)
+```
+renewable-energy/
+├── api/                 # Vercel serverless functions (Flask backend)
+│   ├── index.py        # Main Flask app
+│   ├── services/       # Weather service
+│   └── requirements.txt
+├── frontend/           # React frontend
+│   ├── src/
+│   └── package.json
+├── backend/            # Original Flask app (for local dev)
+├── vercel.json         # Vercel configuration
+└── README.md
+```
 
 ## License
 
