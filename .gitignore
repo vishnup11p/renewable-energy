@@ -1,0 +1,6 @@
+# Local DB and instance folder
+backend/instance/
+*.db
+__pycache__/
+.env
+node_modules/

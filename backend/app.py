@@ -5,6 +5,7 @@ Realistic solar monitoring with real weather data integration
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
 import math
 import random
 from datetime import datetime, timedelta
@@ -16,20 +17,118 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'services'))
 from weather_service import get_weather, calculate_sunlight_factor, get_weather_icon_emoji
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///energy.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 CORS(app)  # Enable CORS for frontend communication
+db = SQLAlchemy(app)
 
-# System Configuration - User can modify these settings
-system_config = {
-    'city': 'Mumbai',           # Default city
-    'solar_capacity': 10,       # Solar system capacity in kW
-    'battery_size': 10,         # Battery capacity in kWh
-    'panel_efficiency': 0.85,   # Panel efficiency (0-1)
-    'consumption_base': 5       # Base consumption in kW
-}
 
-# Simulated data storage
-energy_history = []
-battery_level = 65  # Starting battery level (%)
+# --- Models ---
+class EnergyLog(db.Model):
+    __tablename__ = 'energy_log'
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, nullable=False)
+    solar_generation = db.Column(db.Float, default=0)
+    wind_generation = db.Column(db.Float, default=0)
+    total_generation = db.Column(db.Float, default=0)
+    consumption = db.Column(db.Float, default=0)
+    battery_level = db.Column(db.Float, default=50)
+    grid_import = db.Column(db.Float, default=0)
+    grid_export = db.Column(db.Float, default=0)
+    efficiency = db.Column(db.Float, default=0)
+    temperature = db.Column(db.Float, default=0)
+    weather_desc = db.Column(db.String(64), default='Clear')
+
+
+class SystemConfig(db.Model):
+    __tablename__ = 'system_config'
+    id = db.Column(db.Integer, primary_key=True)
+    city = db.Column(db.String(128), default='Mumbai')
+    solar_capacity = db.Column(db.Float, default=10)
+    battery_size = db.Column(db.Float, default=10)
+    panel_efficiency = db.Column(db.Float, default=0.85)
+    consumption_base = db.Column(db.Float, default=5)
+    weather_api_key = db.Column(db.String(256), default=None)
+
+
+def get_config_from_db():
+    """Get or create the single system config row."""
+    config = SystemConfig.query.first()
+    if config is None:
+        config = SystemConfig(
+            city='Mumbai',
+            solar_capacity=10,
+            battery_size=10,
+            panel_efficiency=0.85,
+            consumption_base=5
+        )
+        db.session.add(config)
+        db.session.commit()
+    return config
+
+
+def seed_history_data():
+    """Seed 30 days of hourly energy history for charts (only if empty)."""
+    if EnergyLog.query.first() is not None:
+        return
+    config = get_config_from_db()
+    current_time = datetime.now() - timedelta(days=30)
+    battery = 50.0
+    for _ in range(30 * 24):
+        month = current_time.month
+        hour = current_time.hour
+        # Simulate weather based on season (basic approximation)
+        is_monsoon = 6 <= month <= 9
+        base_temp = 30 - (5 if is_monsoon else 0) + (5 if 10 <= hour <= 15 else 0)
+        temp = base_temp + random.uniform(-2, 2)
+        if is_monsoon and random.random() < 0.4:
+            weather = "Rain"
+            clouds = random.uniform(70, 100)
+        elif random.random() < 0.2:
+            weather = "Clouds"
+            clouds = random.uniform(30, 80)
+        else:
+            weather = "Clear"
+            clouds = random.uniform(0, 20)
+        # Solar Gen
+        if 6 <= hour <= 18:
+            time_factor = math.sin(((hour - 6) / 12) * math.pi)
+            cloud_factor = 1.0 - (clouds / 100 * 0.7)
+            solar = config.solar_capacity * time_factor * cloud_factor * config.panel_efficiency
+        else:
+            solar = 0.0
+        # Wind Gen
+        wind = 5.0 * random.uniform(0.1, 0.8)
+        total_gen = solar + wind
+        # Consumption
+        base_cons = config.consumption_base
+        usage_factor = 1.5 if (7 <= hour <= 10 or 18 <= hour <= 21) else 0.8
+        consumption = base_cons * usage_factor * random.uniform(0.8, 1.2)
+        # Battery Physics
+        net = total_gen - consumption
+        battery_change = (net / config.battery_size) * 100
+        battery = max(0, min(100, battery + battery_change))
+        # Grid
+        import_kw = max(0, consumption - total_gen) if battery < 5 else 0
+        export_kw = max(0, total_gen - consumption) if battery > 95 else 0
+        log = EnergyLog(
+            timestamp=current_time,
+            solar_generation=round(solar, 2),
+            wind_generation=round(wind, 2),
+            total_generation=round(total_gen, 2),
+            consumption=round(consumption, 2),
+            battery_level=round(battery, 1),
+            grid_import=round(import_kw, 2),
+            grid_export=round(export_kw, 2),
+            efficiency=round(config.panel_efficiency * 100 - max(0, (temp - 25) * 0.5), 1),
+            temperature=round(temp, 1),
+            weather_desc=weather
+        )
+        db.session.add(log)
+        current_time += timedelta(hours=1)
+    db.session.commit()
+    print("Seeded 30 days of history!")
+
 
 optimization_tips = [
     "Run heavy appliances between 11 AM - 2 PM for maximum solar usage",
@@ -39,462 +138,326 @@ optimization_tips = [
     "Grid rates are high. Switch to battery power for savings"
 ]
 
-def calculate_realistic_solar_generation(city, solar_capacity, efficiency):
-    """
-    Calculate realistic solar generation based on real weather and time of day
+def calculate_current_state():
+    """Calculates one realtime data point and saves to DB"""
+    config = get_config_from_db()
     
-    Args:
-        city (str): City name for weather data
-        solar_capacity (float): Solar system capacity in kW
-        efficiency (float): Panel efficiency (0-1)
+    # Get last log for battery continuity
+    last_log = EnergyLog.query.order_by(EnergyLog.timestamp.desc()).first()
+    current_battery = last_log.battery_level if last_log else 50.0
     
-    Returns:
-        tuple: (solar_generation, weather_data, sunlight_factor)
-    """
-    # Get real weather data
-    weather_response = get_weather(city)
+    # Weather
+    # Pass API key if available
+    api_key = config.weather_api_key
+    weather_response = get_weather(config.city, api_key)
     weather_data = weather_response['data']
     
-    # Calculate sunlight availability factor
     sunlight_factor = calculate_sunlight_factor(weather_data)
     
-    # Calculate solar generation
-    # Formula: Generation = Capacity × Sunlight Factor × Efficiency × Random Variation
-    random_variation = random.uniform(0.95, 1.05)  # ±5% variation for realism
-    solar_generation = solar_capacity * sunlight_factor * efficiency * random_variation
+    # Solar Gen
+    random_variation = random.uniform(0.95, 1.05)
+    solar = config.solar_capacity * sunlight_factor * config.panel_efficiency * random_variation
+    solar = max(0, round(solar, 2))
     
-    # Ensure non-negative
-    solar_generation = max(0, solar_generation)
+    # Wind Gen
+    wind = round(5.0 * random.uniform(0.1, 0.6), 2)
+    total_gen = round(solar + wind, 2)
     
-    return round(solar_generation, 2), weather_data, round(sunlight_factor * 100, 1)
-
-def get_time_factor():
-    """
-    Calculate solar generation factor based on time of day
-    Solar generation follows a sine curve (0 at night, peak at noon)
-    """
-    current_hour = datetime.now().hour
-    # Solar generation is 0 from 6 PM to 6 AM, peaks at noon
-    if current_hour < 6 or current_hour > 18:
-        return 0
-    # Use sine wave for realistic solar curve
-    time_normalized = (current_hour - 6) / 12  # Normalize to 0-1
-    return math.sin(time_normalized * math.pi)
-
-def generate_wind_power():
-    """
-    Generate realistic wind power output in kW
-    Wind is more random and can generate at night
-    """
-    base_capacity = 5  # 5 kW wind turbine
-    wind_speed = random.uniform(0.3, 1.0)  # Wind speed variation
-    wind_power = base_capacity * wind_speed
-    return round(wind_power, 2)
+    # Consumption
+    consumption = round(config.consumption_base * random.uniform(0.8, 1.2), 2)
+    
+    # Battery Update
+    net_power = total_gen - consumption
+    # Simulate 5% capacity change per hour equivalent update (since we update every few secs, this logic is simplified for realtime feel)
+    # Ideally should be: (net_power / capacity) * (time_delta_in_hours)
+    # We'll just nudge it slightly for the realtime effect
+    battery_change = (net_power / config.battery_size) * 0.1 
+    new_battery = max(0, min(100, current_battery + battery_change))
+    
+    # Grid
+    grid_import = max(0, consumption - total_gen) if total_gen < consumption and new_battery < 5 else 0
+    grid_export = max(0, total_gen - consumption) if total_gen > consumption and new_battery > 95 else 0
+    
+    # Efficiency
+    temp = weather_data['temperature']
+    base_eff = config.panel_efficiency * 100
+    eff = round(base_eff - max(0, (temp - 25) * 0.5), 1)
+    
+    # Create Log
+    new_log = EnergyLog(
+        timestamp=datetime.now(),
+        solar_generation=solar,
+        wind_generation=wind,
+        total_generation=total_gen,
+        consumption=consumption,
+        battery_level=round(new_battery, 1),
+        grid_import=round(grid_import, 2),
+        grid_export=round(grid_export, 2),
+        efficiency=eff,
+        temperature=temp,
+        weather_desc=weather_data['weather']
+    )
+    db.session.add(new_log)
+    db.session.commit()
+    
+    return new_log, weather_data, sunlight_factor
 
 @app.route('/api/energy', methods=['GET'])
 def get_energy_data():
-    """
-    Main API endpoint - Returns comprehensive energy system status
-    Uses real weather data and realistic solar simulation
-    """
-    global battery_level
+    """Main API endpoint - Returns comprehensive energy system status"""
+    log, weather_data, sunlight_factor = calculate_current_state()
+    config = get_config_from_db()
     
-    # Get realistic solar generation based on weather
-    solar, weather_data, sunlight_level = calculate_realistic_solar_generation(
-        system_config['city'],
-        system_config['solar_capacity'],
-        system_config['panel_efficiency']
-    )
+    # Derived metrics
+    co2 = round(log.total_generation * 0.92, 2)
+    savings = round(log.total_generation * 8, 2)
     
-    # Wind generation (optional, can be disabled)
-    wind = generate_wind_power()
-    total_generation = solar + wind
+    # Performance score
+    perf = round((log.efficiency + (log.battery_level * 0.3) + (min(log.total_generation, config.solar_capacity) * 5)) / 2, 1)
     
-    # Simulate consumption with some variation
-    consumption = round(system_config['consumption_base'] * random.uniform(0.8, 1.2), 2)
+    battery_status = 'Optimal'
+    if log.battery_level > 80: battery_status = 'Charging'
+    elif log.battery_level < 20: battery_status = 'Low'
     
-    # Calculate battery level based on generation vs consumption
-    net_power = total_generation - consumption
-    battery_change = (net_power / system_config['battery_size']) * 100 * 0.05  # 5% per cycle
-    
-    battery_level = max(0, min(100, battery_level + battery_change))
-    battery_level = round(battery_level, 1)
-    
-    # Calculate efficiency (affected by temperature)
-    temperature = weather_data['temperature']
-    base_efficiency = system_config['panel_efficiency'] * 100
-    temp_loss = max(0, (temperature - 25) * 0.5)  # Efficiency drops with heat
-    efficiency = round(base_efficiency - temp_loss, 1)
-    
-    # Grid usage
-    grid_import = max(0, consumption - total_generation) if consumption > total_generation else 0
-    grid_export = max(0, total_generation - consumption) if total_generation > consumption else 0
-    
-    # CO2 saved (0.92 kg per kWh)
-    co2_saved = round(total_generation * 0.92, 2)
-    
-    # Savings in rupees (₹8 per kWh saved)
-    savings = round(total_generation * 8, 2)
-    
-    # Panel voltage and status
-    panel_voltage = round(random.uniform(380, 420), 1)
-    panel_temp = round(temperature + random.uniform(5, 15), 1)
-    
-    # Performance score (0-100)
-    performance = round((efficiency + (battery_level * 0.3) + (min(total_generation, system_config['solar_capacity']) * 5)) / 2, 1)
-    
-    # Battery status
-    if battery_level > 80:
-        battery_status = 'Charging'
-    elif battery_level > 20:
-        battery_status = 'Optimal'
-    else:
-        battery_status = 'Low'
-    
-    # Backup time calculation (hours)
-    backup_time = round((battery_level / 100) * (system_config['battery_size'] / consumption), 1)
-    
-    timestamp = datetime.now().strftime('%H:%M:%S')
+    backup_time = round((log.battery_level / 100) * (config.battery_size / max(0.1, log.consumption)), 1)
     
     data = {
-        'solar_generation': solar,
-        'wind_generation': wind,
-        'total_generation': round(total_generation, 2),
-        'consumption': consumption,
-        'battery': battery_level,
+        'solar_generation': log.solar_generation,
+        'wind_generation': log.wind_generation,
+        'total_generation': log.total_generation,
+        'consumption': log.consumption,
+        'battery': log.battery_level,
         'battery_status': battery_status,
         'backup_time': backup_time,
-        'temperature': weather_data['temperature'],
-        'efficiency': efficiency,
-        'co2_saved': co2_saved,
+        'temperature': log.temperature,
+        'efficiency': log.efficiency,
+        'co2_saved': co2,
         'savings': savings,
-        'timestamp': timestamp,
-        'grid_import': round(grid_import, 2),
-        'grid_export': round(grid_export, 2),
-        'panel_voltage': panel_voltage,
-        'panel_temperature': panel_temp,
-        'performance_score': performance,
+        'timestamp': log.timestamp.strftime('%H:%M:%S'),
+        'grid_import': log.grid_import,
+        'grid_export': log.grid_export,
+        'panel_voltage': round(random.uniform(380, 420), 1),
+        'panel_temperature': round(log.temperature + random.uniform(5, 15), 1),
+        'performance_score': perf,
         'weather': weather_data['weather'],
         'weather_description': weather_data['description'],
-        'sunlight_level': sunlight_level,
+        'sunlight_level': round(sunlight_factor * 100, 1),
         'clouds': weather_data['clouds'],
         'humidity': weather_data['humidity'],
         'wind_speed': weather_data['wind_speed'],
         'city': weather_data['city'],
         'weather_icon': get_weather_icon_emoji(weather_data['icon'])
     }
-    
-    # Store in history (keep last 30 readings)
-    energy_history.append(data)
-    if len(energy_history) > 30:
-        energy_history.pop(0)
-    
     return jsonify(data)
 
 @app.route('/api/config', methods=['GET'])
-def get_config():
-    """
-    Get current system configuration
-    """
+def get_config_endpoint():
+    config = get_config_from_db()
     return jsonify({
         'success': True,
-        'config': system_config
+        'config': {
+            'city': config.city,
+            'solar_capacity': config.solar_capacity,
+            'battery_size': config.battery_size,
+            'panel_efficiency': config.panel_efficiency,
+            'consumption_base': config.consumption_base,
+            'weather_api_key': config.weather_api_key or ''
+        }
     })
 
 @app.route('/api/config', methods=['POST'])
-def update_config():
-    """
-    Update system configuration
-    Allows user to change city, solar capacity, battery size, efficiency
-    """
-    global system_config
-    
+def update_config_endpoint():
     data = request.get_json()
+    config = get_config_from_db()
     
-    # Update configuration with provided values
-    if 'city' in data:
-        system_config['city'] = data['city']
-    if 'solar_capacity' in data:
-        system_config['solar_capacity'] = float(data['solar_capacity'])
-    if 'battery_size' in data:
-        system_config['battery_size'] = float(data['battery_size'])
-    if 'panel_efficiency' in data:
-        system_config['panel_efficiency'] = float(data['panel_efficiency'])
-    if 'consumption_base' in data:
-        system_config['consumption_base'] = float(data['consumption_base'])
+    if 'city' in data: config.city = data['city']
+    if 'solar_capacity' in data: config.solar_capacity = float(data['solar_capacity'])
+    if 'battery_size' in data: config.battery_size = float(data['battery_size'])
+    if 'panel_efficiency' in data: config.panel_efficiency = float(data['panel_efficiency'])
+    if 'consumption_base' in data: config.consumption_base = float(data['consumption_base'])
+    if 'weather_api_key' in data: config.weather_api_key = data['weather_api_key']
     
-    return jsonify({
-        'success': True,
-        'message': 'Configuration updated successfully',
-        'config': system_config
-    })
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Configuration updated successfully'})
 
 @app.route('/api/weather', methods=['GET'])
-def get_weather_data():
-    """
-    Get real-time weather data for a specific city
-    Query parameter: city (optional, defaults to system config city)
-    """
-    city = request.args.get('city', system_config['city'])
+def get_weather_endpoint():
+    config = get_config_from_db()
+    city = request.args.get('city', config.city)
     
-    weather_response = get_weather(city)
+    # Use stored API key
+    weather_response = get_weather(city, config.weather_api_key)
     
     if weather_response['success']:
         weather_data = weather_response['data']
+        # Recalculate sunlight for this specific weather check
         weather_data['sunlight_factor'] = calculate_sunlight_factor(weather_data)
         weather_data['icon_emoji'] = get_weather_icon_emoji(weather_data['icon'])
-        
-        return jsonify({
-            'success': True,
-            'weather': weather_data
-        })
+        return jsonify({'success': True, 'weather': weather_data})
     else:
-        return jsonify({
-            'success': False,
-            'error': weather_response['error'],
-            'weather': weather_response['data']
-        }), 500
+        return jsonify({'success': False, 'error': weather_response.get('error'), 'weather': weather_response['data']}), 500
+
+@app.route('/api/history', methods=['GET'])
+def get_history_endpoint():
+    # Return last 50 entries
+    logs = EnergyLog.query.order_by(EnergyLog.timestamp.desc()).limit(50).all()
+    # Reverse to show chronological order for charts
+    history_data = []
+    for log in reversed(logs):
+        history_data.append({
+            'timestamp': log.timestamp.strftime('%H:%M:%S'),
+            'solar_generation': log.solar_generation,
+            'wind_generation': log.wind_generation,
+            'total_generation': log.total_generation,
+            'consumption': log.consumption,
+            'battery': log.battery_level,
+            'temperature': log.temperature,
+            'efficiency': log.efficiency
+        })
+    return jsonify(history_data)
+
+@app.route('/api/monthly', methods=['GET'])
+def get_monthly_endpoint():
+    # Aggregate data by day for the last 30 days
+    # Since specific daily aggregation query might be complex in raw SQL/ORM for this quick setup,
+    # we'll fetch all hourly logs and aggregate in python or just take daily snapshots if we had them.
+    # For now, let's take one reading per day from the logs we seeded/have.
+    
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=30)
+    
+    # Simple approach: Fetch all logs in range and aggregate by day
+    logs = EnergyLog.query.filter(EnergyLog.timestamp >= start_date).all()
+    
+    daily_map = {}
+    for log in logs:
+        day_str = log.timestamp.strftime('%Y-%m-%d')
+        if day_str not in daily_map:
+            daily_map[day_str] = {'solar': 0, 'wind': 0, 'cons': 0, 'count': 0}
+        
+        daily_map[day_str]['solar'] += log.solar_generation
+        daily_map[day_str]['wind'] += log.wind_generation
+        daily_map[day_str]['cons'] += log.consumption
+        daily_map[day_str]['count'] += 1
+    
+    monthly_data = []
+    # Sort keys
+    for day in sorted(daily_map.keys()):
+        d = daily_map[day]
+        # Average power (kW) * 24h = Energy (kWh) approx? 
+        # Actually our logs are hourly in seed, so sum of kW happens to be kWh approximately if sampled hourly.
+        # But if we have multiple samples per hour, we need to average power then multiply by 24?
+        # Let's just assume the sum of samples / samples * 24 roughly.
+        
+        avg_solar = d['solar'] / d['count']
+        avg_wind = d['wind'] / d['count']
+        avg_cons = d['cons'] / d['count']
+        
+        monthly_data.append({
+            'day': datetime.strptime(day, '%Y-%m-%d').day,
+            'solar': round(avg_solar * 24, 2), # kWh
+            'wind': round(avg_wind * 24, 2),
+            'consumption': round(avg_cons * 24, 2),
+            'total': round((avg_solar + avg_wind) * 24, 2)
+        })
+        
+    return jsonify(monthly_data)
 
 @app.route('/api/optimization', methods=['GET'])
-def get_optimization():
-    """
-    Returns smart optimization suggestions
-    """
+def get_optimization_endpoint():
     hour = datetime.now().hour
     
-    # Time-based recommendations
+    # Logic similar to before
     if 10 <= hour <= 14:
-        tip = "Peak solar hours! Run washing machine, dishwasher, or charge EVs now"
-        priority = "high"
+        tip, priority = "Peak solar hours! Run heavy loads now.", "high"
     elif 6 <= hour <= 10:
-        tip = "Morning sun rising. Good time to charge battery for evening use"
-        priority = "medium"
+        tip, priority = "Morning sun. Charge battery.", "medium"
     elif 15 <= hour <= 18:
-        tip = "Solar declining. Switch to battery power for evening loads"
-        priority = "medium"
+        tip, priority = "Solar declining. Prepare for evening.", "medium"
     else:
-        tip = "Night mode. Using battery power. Grid import minimized"
-        priority = "low"
-    
-    # Get current data
-    if energy_history:
-        current = energy_history[-1]
-        battery = current['battery']
+        tip, priority = "Night time. Minimal grid usage.", "low"
         
-        if battery > 90:
-            battery_tip = "Battery full. Consider exporting to grid for extra income"
-        elif battery < 30:
-            battery_tip = "Battery low. Reduce non-essential loads"
-        else:
-            battery_tip = "Battery level optimal. System running efficiently"
-    else:
-        battery_tip = "System initializing..."
+    log = EnergyLog.query.order_by(EnergyLog.timestamp.desc()).first()
+    bat = log.battery_level if log else 50
     
-    # Timeline data for optimization page
+    bat_tip = "Battery optimal."
+    if bat > 90: bat_tip = "Battery full. Exporting recommended."
+    elif bat < 30: bat_tip = "Battery low. Conserve energy."
+
     timeline = [
-        {
-            'time': '06:00 - 10:00',
-            'period': 'Morning',
-            'solar': 'Rising',
-            'recommendation': 'Light loads, charge battery',
-            'icon': '🌅'
-        },
-        {
-            'time': '10:00 - 14:00',
-            'period': 'Peak Hours',
-            'solar': 'Maximum',
-            'recommendation': 'Run heavy appliances, AC, washing machine',
-            'icon': '☀️'
-        },
-        {
-            'time': '14:00 - 18:00',
-            'period': 'Afternoon',
-            'solar': 'Declining',
-            'recommendation': 'Moderate loads, prepare battery',
-            'icon': '🌤️'
-        },
-        {
-            'time': '18:00 - 22:00',
-            'period': 'Evening',
-            'solar': 'None',
-            'recommendation': 'Use battery, minimize grid import',
-            'icon': '🌙'
-        },
-        {
-            'time': '22:00 - 06:00',
-            'period': 'Night',
-            'solar': 'None',
-            'recommendation': 'Essential loads only, sleep mode',
-            'icon': '🌃'
-        }
+        {'time': '06-10', 'period': 'Morning', 'solar': 'Rising', 'recommendation': 'Charge Battery', 'icon': '🌅'},
+        {'time': '10-14', 'period': 'Peak', 'solar': 'Max', 'recommendation': 'Heavy Loads', 'icon': '☀️'},
+        {'time': '14-18', 'period': 'Afternoon', 'solar': 'Declining', 'recommendation': 'Moderate Usage', 'icon': '🌤️'},
+        {'time': '18-22', 'period': 'Evening', 'solar': 'None', 'recommendation': 'Battery Power', 'icon': '🌙'},
+        {'time': '22-06', 'period': 'Night', 'solar': 'None', 'recommendation': 'Sleep Mode', 'icon': '🌃'},
     ]
     
     return jsonify({
         'current_tip': tip,
         'priority': priority,
-        'battery_tip': battery_tip,
+        'battery_tip': bat_tip,
         'timeline': timeline,
         'tips': random.sample(optimization_tips, 3)
     })
 
-@app.route('/api/history', methods=['GET'])
-def get_history():
-    """
-    Returns recent energy history for charts
-    """
-    return jsonify(energy_history)
-
 @app.route('/api/prediction', methods=['GET'])
-def get_prediction():
-    """
-    Predict solar output for next 24 hours
-    Uses mathematical model based on time of day
-    """
+def get_prediction_endpoint():
+    # Simple prediction based on time
     predictions = []
     current_time = datetime.now()
-    
     for i in range(24):
         future_time = current_time + timedelta(hours=i)
-        hour = future_time.hour
-        
-        # Calculate predicted solar output
-        if hour < 6 or hour > 18:
-            predicted_solar = 0
+        h = future_time.hour
+        if 6 <= h <= 18:
+            norm = (h - 6) / 12
+            base = 10 * math.sin(norm * math.pi)
+            pred = round(base * random.uniform(0.8, 1.0), 2)
         else:
-            time_normalized = (hour - 6) / 12
-            base_output = 10 * math.sin(time_normalized * math.pi)
-            # Add slight random variation
-            predicted_solar = round(base_output * random.uniform(0.85, 0.95), 2)
+            pred = 0
         
         predictions.append({
             'hour': future_time.strftime('%H:00'),
-            'predicted_solar': predicted_solar,
-            'predicted_wind': round(random.uniform(1.5, 4.5), 2)
+            'predicted_solar': pred,
+            'predicted_wind': round(random.uniform(1, 4), 2)
         })
-    
     return jsonify(predictions)
 
-@app.route('/api/monthly', methods=['GET'])
-def get_monthly_data():
-    """
-    Returns monthly energy generation data
-    Simulates 30 days of data
-    """
-    monthly_data = []
-    
-    for day in range(1, 31):
-        # Average daily generation with some variation
-        daily_solar = round(random.uniform(40, 70), 2)  # kWh per day
-        daily_wind = round(random.uniform(20, 40), 2)   # kWh per day
-        daily_consumption = round(random.uniform(50, 80), 2)
-        
-        monthly_data.append({
-            'day': day,
-            'solar': daily_solar,
-            'wind': daily_wind,
-            'consumption': daily_consumption,
-            'total': round(daily_solar + daily_wind, 2)
-        })
-    
-    return jsonify(monthly_data)
-
 @app.route('/api/calculate-solar', methods=['POST'])
-def calculate_solar_system():
-    """
-    Solar system calculator
-    Calculates required panels, battery, and costs based on daily load
-    """
-    from flask import request
-    
+def calculate_solar_endpoint():
     data = request.get_json()
-    daily_load = float(data.get('daily_load', 10))  # kWh per day
+    load = float(data.get('daily_load', 10))
     
-    # Calculations
-    # Assume 5 peak sun hours per day
-    peak_sun_hours = 5
-    system_size = daily_load / peak_sun_hours  # kW
+    # logic ...
+    size = load / 5
+    panels = math.ceil(size / 0.4)
+    bat = load * 2
+    cost = (panels*200) + (bat*300) + (size*500)
+    cost *= 1.2 # install
     
-    # Number of panels (assuming 400W panels)
-    panel_wattage = 0.4  # kW
-    num_panels = math.ceil(system_size / panel_wattage)
-    
-    # Battery size (2 days backup)
-    battery_capacity = daily_load * 2  # kWh
-    
-    # Cost estimation (approximate)
-    panel_cost = num_panels * 200  # $200 per panel
-    battery_cost = battery_capacity * 300  # $300 per kWh
-    inverter_cost = system_size * 500  # $500 per kW
-    installation_cost = (panel_cost + battery_cost + inverter_cost) * 0.2
-    
-    total_cost = panel_cost + battery_cost + inverter_cost + installation_cost
-    
-    # Annual savings (assuming $0.12 per kWh)
-    annual_savings = daily_load * 365 * 0.12
-    payback_period = total_cost / annual_savings
-    
-    result = {
-        'system_size_kw': round(system_size, 2),
-        'num_panels': num_panels,
-        'battery_capacity_kwh': round(battery_capacity, 2),
-        'total_cost': round(total_cost, 2),
-        'annual_savings': round(annual_savings, 2),
-        'payback_period_years': round(payback_period, 1),
-        'co2_reduction_kg_year': round(daily_load * 365 * 0.92, 2)
-    }
-    
-    return jsonify(result)
-
-@app.route('/api/login', methods=['POST'])
-def login():
-    """
-    Simple login endpoint for demo purposes
-    """
-    from flask import request
-    
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
-    
-    # Simple authentication (for demo only)
-    if username == 'admin' and password == 'admin123':
-        return jsonify({
-            'success': True,
-            'message': 'Login successful',
-            'token': 'demo-token-12345'
-        })
-    else:
-        return jsonify({
-            'success': False,
-            'message': 'Invalid credentials'
-        }), 401
-
-@app.route('/', methods=['GET'])
-def home():
-    """
-    API home endpoint
-    """
     return jsonify({
-        'message': 'Renewable Energy Monitoring API',
-        'version': '1.0',
-        'endpoints': [
-            '/api/energy',
-            '/api/history',
-            '/api/prediction',
-            '/api/monthly',
-            '/api/calculate-solar',
-            '/api/login'
-        ]
+        'system_size_kw': round(size, 2),
+        'num_panels': panels,
+        'battery_capacity_kwh': round(bat, 2),
+        'total_cost': round(cost, 2),
+        'annual_savings': round(load * 365 * 0.12, 2),
+        'payback_period_years': round(cost / (load*365*0.12), 1),
+        'co2_reduction_kg_year': round(load * 365 * 0.92, 2)
     })
 
+@app.route('/api/login', methods=['POST'])
+def login_endpoint():
+    data = request.get_json()
+    if data.get('username') == 'admin' and data.get('password') == 'admin123':
+        return jsonify({'success': True, 'token': 'demo-token'})
+    return jsonify({'success': False}), 401
+
+# --- Init ---
+
 if __name__ == '__main__':
-    print("🌞 Renewable Energy Monitoring API Server")
-    print("📡 Server running on http://localhost:5000")
-    print("🔌 Endpoints available:")
-    print("   - GET  /api/energy")
-    print("   - GET  /api/history")
-    print("   - GET  /api/prediction")
-    print("   - GET  /api/monthly")
-    print("   - POST /api/calculate-solar")
-    print("   - POST /api/login")
+    with app.app_context():
+        db.create_all()
+        seed_history_data()
+        
+    print("Server running with SQLite persistence on http://127.0.0.1:5000")
     app.run(debug=True, port=5000)
+
