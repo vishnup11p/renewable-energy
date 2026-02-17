@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import API_BASE_URL from '../config/api';
 import { Line, Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -43,8 +44,8 @@ const Analytics = () => {
   const fetchAnalyticsData = async () => {
     try {
       const [predResponse, monthlyResponse] = await Promise.all([
-        axios.get('http://localhost:5000/api/prediction'),
-        axios.get('http://localhost:5000/api/monthly')
+        axios.get(`${API_BASE_URL}/api/prediction`),
+        axios.get(`${API_BASE_URL}/api/monthly`)
       ]);
       
       setPredictions(predResponse.data);

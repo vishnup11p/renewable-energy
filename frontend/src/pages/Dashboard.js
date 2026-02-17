@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Bar } from 'react-chartjs-2';
+import API_BASE_URL from '../config/api';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -26,8 +27,8 @@ const Dashboard = () => {
   const fetchData = async () => {
     try {
       const [energyRes, historyRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/energy'),
-        axios.get('http://localhost:5000/api/history')
+        axios.get(`${API_BASE_URL}/api/energy`),
+        axios.get(`${API_BASE_URL}/api/history`)
       ]);
       setEnergyData(energyRes.data);
       setHistory(historyRes.data);

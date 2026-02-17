@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import API_BASE_URL from '../config/api';
 
 const Reports = () => {
   const [monthlyData, setMonthlyData] = useState([]);
@@ -13,7 +14,7 @@ const Reports = () => {
   useEffect(() => {
     const fetchMonthly = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/monthly');
+        const response = await axios.get(`${API_BASE_URL}/api/monthly`);
         setMonthlyData(response.data);
         setLoading(false);
       } catch (error) {

@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import API_BASE_URL from '../config/api';
 
 const Settings = () => {
   const [settings, setSettings] = useState({
@@ -56,7 +57,7 @@ const Settings = () => {
 
   const fetchConfig = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/config');
+      const response = await axios.get(`${API_BASE_URL}/api/config`);
       if (response.data.success) {
         setSystemConfig(response.data.config);
       }
@@ -78,7 +79,7 @@ const Settings = () => {
     setMessage('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/config', systemConfig);
+      const response = await axios.post(`${API_BASE_URL}/api/config`, systemConfig);
       
       if (response.data.success) {
         setMessage('✅ Configuration saved successfully! Dashboard will update automatically.');
