@@ -54,7 +54,7 @@ const AIChatbot = () => {
     }
     
     if (message.includes('settings') || message.includes('configure')) {
-      return 'You can configure: 1) City location, 2) Solar capacity (kW), 3) Battery size (kWh), 4) Panel efficiency (%), 5) Base consumption (kW). Go to Settings page to make changes.';
+      return 'You can configure: 1) City location, 2) Solar capacity (kW), 3) Battery size (V), 4) Panel efficiency (%), 5) Base consumption (kW). Go to Settings page to make changes.';
     }
     
     // Weather Questions
@@ -67,24 +67,19 @@ const AIChatbot = () => {
       return 'Panel efficiency is affected by: 1) Temperature (higher temp = lower efficiency), 2) Dust/dirt on panels, 3) Panel age, 4) Shading. Optimal efficiency is 85-95%. Clean panels regularly and ensure good ventilation.';
     }
     
-    // Grid Questions
-    if (message.includes('grid') && (message.includes('export') || message.includes('sell'))) {
-      return 'Grid export happens when: 1) Battery is full, 2) Generation exceeds consumption. You can earn by selling excess power to the grid. Check your grid export value in the dashboard for potential earnings.';
-    }
-    
     // Cost/Savings Questions
     if (message.includes('savings') || message.includes('money') || message.includes('cost')) {
-      return 'Your savings are calculated as: Generation × ₹8 per kWh. To maximize savings: 1) Use appliances during peak solar hours, 2) Minimize grid import, 3) Export excess to grid, 4) Maintain system efficiency.';
+      return 'Your savings are calculated as: Solar generation x tariff rate. To maximize savings: 1) Use appliances during peak solar hours, 2) Maintain battery health, 3) Improve panel cleanliness, 4) Keep panel efficiency high.';
     }
     
     // Calculator Questions
     if (message.includes('calculator') || message.includes('size') || message.includes('panels')) {
-      return 'Use the Solar Calculator page to: 1) Enter your daily load (kWh), 2) Get system size recommendations, 3) See required number of panels, 4) Calculate battery capacity, 5) Estimate costs and payback period.';
+      return 'Use the Solar Calculator page to: 1) Enter your daily reading (V), 2) Get system size recommendations, 3) See required number of panels, 4) Calculate battery capacity, 5) Estimate costs and payback period.';
     }
     
     // Optimization Questions
     if (message.includes('optimize') || message.includes('best time')) {
-      return 'Best practices: 1) Run heavy appliances 11 AM - 2 PM (peak solar), 2) Charge EVs during day, 3) Use battery at night, 4) Minimize grid import during peak rates, 5) Check Optimization page for smart recommendations.';
+      return 'Best practices: 1) Run heavy appliances 11 AM - 2 PM (peak solar), 2) Charge EVs during day, 3) Use battery at night, 4) Keep loads balanced, 5) Check Optimization page for smart recommendations.';
     }
     
     // API Key Questions
@@ -94,11 +89,11 @@ const AIChatbot = () => {
     
     // General Help
     if (message.includes('help') || message.includes('how') || message.includes('what')) {
-      return 'I can help you with: Solar generation, Battery management, System configuration, Weather impact, Efficiency tips, Cost savings, Grid export, Calculator usage, and Optimization. What would you like to know?';
+      return 'I can help you with: Solar generation, Battery management, System configuration, Weather impact, Efficiency tips, Cost savings, Calculator usage, and Optimization. What would you like to know?';
     }
     
     // Default Response
-    return 'I\'m here to help! You can ask me about: solar generation, battery charging, system settings, weather effects, efficiency, savings, grid export, or optimization tips. What would you like to know?';
+    return 'I\'m here to help! You can ask me about: solar generation, battery charging, system settings, weather effects, efficiency, savings, or optimization tips. What would you like to know?';
   };
 
   const handleSend = () => {

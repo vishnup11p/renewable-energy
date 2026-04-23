@@ -66,17 +66,10 @@ const Analytics = () => {
     labels: predictions.map(p => p.hour),
     datasets: [
       {
-        label: 'Predicted Solar (kW)',
+        label: 'Predicted Solar (V)',
         data: predictions.map(p => p.predicted_solar),
         borderColor: 'rgb(251, 191, 36)',
         backgroundColor: 'rgba(251, 191, 36, 0.5)',
-        tension: 0.4
-      },
-      {
-        label: 'Predicted Wind (kW)',
-        data: predictions.map(p => p.predicted_wind),
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.5)',
         tension: 0.4
       }
     ]
@@ -87,17 +80,12 @@ const Analytics = () => {
     labels: monthlyData.map(d => `Day ${d.day}`),
     datasets: [
       {
-        label: 'Solar (kWh)',
+        label: 'Solar (V)',
         data: monthlyData.map(d => d.solar),
         backgroundColor: 'rgba(251, 191, 36, 0.8)'
       },
       {
-        label: 'Wind (kWh)',
-        data: monthlyData.map(d => d.wind),
-        backgroundColor: 'rgba(59, 130, 246, 0.8)'
-      },
-      {
-        label: 'Consumption (kWh)',
+        label: 'Consumption (V)',
         data: monthlyData.map(d => d.consumption),
         backgroundColor: 'rgba(239, 68, 68, 0.8)'
       }
@@ -135,9 +123,8 @@ const Analytics = () => {
 
   // Calculate statistics
   const totalSolar = monthlyData.reduce((sum, d) => sum + d.solar, 0);
-  const totalWind = monthlyData.reduce((sum, d) => sum + d.wind, 0);
   const totalConsumption = monthlyData.reduce((sum, d) => sum + d.consumption, 0);
-  const avgDaily = (totalSolar + totalWind) / monthlyData.length;
+  const avgDaily = monthlyData.length ? totalSolar / monthlyData.length : 0;
 
   if (loading) {
     return (
@@ -197,19 +184,19 @@ const Analytics = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
             <h3 className="text-gray-400 text-sm mb-2">Total Solar (30 days)</h3>
-            <p className="text-2xl font-bold text-yellow-400">{totalSolar.toFixed(2)} kWh</p>
+            <p className="text-2xl font-bold text-yellow-400">{totalSolar.toFixed(2)} V</p>
           </div>
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-            <h3 className="text-gray-400 text-sm mb-2">Total Wind (30 days)</h3>
-            <p className="text-2xl font-bold text-blue-400">{totalWind.toFixed(2)} kWh</p>
+            <h3 className="text-gray-400 text-sm mb-2">Solar Share</h3>
+            <p className="text-2xl font-bold text-blue-400">100%</p>
           </div>
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
             <h3 className="text-gray-400 text-sm mb-2">Total Consumption</h3>
-            <p className="text-2xl font-bold text-red-400">{totalConsumption.toFixed(2)} kWh</p>
+            <p className="text-2xl font-bold text-red-400">{totalConsumption.toFixed(2)} V</p>
           </div>
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
             <h3 className="text-gray-400 text-sm mb-2">Avg Daily Generation</h3>
-            <p className="text-2xl font-bold text-green-400">{avgDaily.toFixed(2)} kWh</p>
+            <p className="text-2xl font-bold text-green-400">{avgDaily.toFixed(2)} V</p>
           </div>
         </div>
 
@@ -234,16 +221,16 @@ const Analytics = () => {
           <div className="bg-gradient-to-br from-green-600 to-emerald-700 rounded-lg p-6">
             <h3 className="text-white font-semibold text-lg mb-2">Energy Surplus</h3>
             <p className="text-3xl font-bold text-white mb-2">
-              {(totalSolar + totalWind - totalConsumption).toFixed(2)} kWh
+              {(totalSolar - totalConsumption).toFixed(2)} V
             </p>
             <p className="text-green-100 text-sm">
-              Excess energy available for grid export or storage
+              Excess solar energy available for storage
             </p>
           </div>
           <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg p-6">
             <h3 className="text-white font-semibold text-lg mb-2">CO₂ Reduction</h3>
             <p className="text-3xl font-bold text-white mb-2">
-              {((totalSolar + totalWind) * 0.92).toFixed(2)} kg
+              {(totalSolar * 0.92).toFixed(2)} kg
             </p>
             <p className="text-blue-100 text-sm">
               Carbon emissions prevented this month

@@ -41,8 +41,7 @@ const Reports = () => {
   }
 
   const totalSolar = monthlyData.reduce((sum, d) => sum + d.solar, 0);
-  const totalWind = monthlyData.reduce((sum, d) => sum + d.wind, 0);
-  const totalGeneration = totalSolar + totalWind;
+  const totalGeneration = totalSolar;
   const savings = totalGeneration * 8;
   const co2Saved = totalGeneration * 0.92;
 
@@ -67,13 +66,13 @@ const Reports = () => {
         <SummaryCard 
           icon="☀️" 
           label="Total Solar Generated" 
-          value={`${totalSolar.toFixed(2)} kWh`}
+          value={`${totalSolar.toFixed(2)} V`}
           color="yellow"
         />
         <SummaryCard 
-          icon="💨" 
-          label="Total Wind Generated" 
-          value={`${totalWind.toFixed(2)} kWh`}
+          icon="⚡" 
+          label="Solar-Only Output" 
+          value="Enabled"
           color="blue"
         />
         <SummaryCard 
@@ -98,10 +97,9 @@ const Reports = () => {
             <thead>
               <tr className="border-b border-gray-800">
                 <th className="text-left py-3 px-4 text-gray-400 font-semibold">Day</th>
-                <th className="text-right py-3 px-4 text-gray-400 font-semibold">Solar (kWh)</th>
-                <th className="text-right py-3 px-4 text-gray-400 font-semibold">Wind (kWh)</th>
-                <th className="text-right py-3 px-4 text-gray-400 font-semibold">Total (kWh)</th>
-                <th className="text-right py-3 px-4 text-gray-400 font-semibold">Consumption (kWh)</th>
+                <th className="text-right py-3 px-4 text-gray-400 font-semibold">Solar (V)</th>
+                <th className="text-right py-3 px-4 text-gray-400 font-semibold">Total (V)</th>
+                <th className="text-right py-3 px-4 text-gray-400 font-semibold">Consumption (V)</th>
                 <th className="text-right py-3 px-4 text-gray-400 font-semibold">Savings (₹)</th>
               </tr>
             </thead>
@@ -110,7 +108,6 @@ const Reports = () => {
                 <tr key={day.day} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
                   <td className="py-3 px-4 text-white">Day {day.day}</td>
                   <td className="py-3 px-4 text-right text-yellow-400">{day.solar.toFixed(2)}</td>
-                  <td className="py-3 px-4 text-right text-blue-400">{day.wind.toFixed(2)}</td>
                   <td className="py-3 px-4 text-right text-green-400 font-semibold">{day.total.toFixed(2)}</td>
                   <td className="py-3 px-4 text-right text-red-400">{day.consumption.toFixed(2)}</td>
                   <td className="py-3 px-4 text-right text-purple-400">₹{(day.total * 8).toFixed(2)}</td>

@@ -89,13 +89,6 @@ const Dashboard = () => {
         backgroundColor: '#f97316',
         borderRadius: 4,
         barThickness: 12
-      },
-      {
-        label: 'Grid',
-        data: [120, 150, 200, 180, 220, 240, 260, 280, 250, 270, 290, 310, 330, 350, 370],
-        backgroundColor: '#fbbf24',
-        borderRadius: 4,
-        barThickness: 12
       }
     ]
   };
@@ -191,10 +184,10 @@ const Dashboard = () => {
                 </div>
               </div>
               <div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm">
-                <div className="text-blue-200 text-xs mb-1">Wind Speed</div>
+                <div className="text-blue-200 text-xs mb-1">Panel Voltage</div>
                 <div className="flex items-center gap-2">
-                  <span>💨</span>
-                  <span className="font-bold">{energyData.wind_speed} km/h</span>
+                  <span>⚡</span>
+                  <span className="font-bold">{energyData.panel_voltage} V</span>
                 </div>
               </div>
               <div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm">
@@ -234,7 +227,7 @@ const Dashboard = () => {
                 <span className="text-gray-400 text-sm">Total Charging</span>
               </div>
               <div className="text-5xl font-bold mb-2">{energyData.total_generation}</div>
-              <div className="text-sm text-gray-400">kWh</div>
+              <div className="text-sm text-gray-400">V</div>
               <div className="flex items-center gap-4 mt-2 text-xs">
                 <span className="text-red-400">Min {history.length ? Math.min(...history.map(h => h.total_generation || 0)).toFixed(1) : '0'}</span>
                 <span className="text-green-400">Max {history.length ? Math.max(...history.map(h => h.total_generation || 0)).toFixed(1) : '0'}</span>
@@ -248,8 +241,8 @@ const Dashboard = () => {
                 <span className="text-gray-400 text-sm">Power Usage</span>
               </div>
               <div className="text-5xl font-bold mb-2">{energyData.consumption}</div>
-              <div className="text-sm text-gray-400">kWh</div>
-              <div className="text-xs text-gray-400 mt-2">1 hour usage: {(energyData.consumption * 1).toFixed(2)} kWh</div>
+              <div className="text-sm text-gray-400">V</div>
+              <div className="text-xs text-gray-400 mt-2">1 hour usage: {(energyData.consumption * 1).toFixed(2)} V</div>
             </div>
           </div>
 
@@ -281,15 +274,15 @@ const Dashboard = () => {
                   <span className="text-sm text-gray-300">Capacity</span>
                 </div>
                 <div className="text-2xl font-bold">{energyData.battery}</div>
-                <div className="text-xs text-gray-400">kWh</div>
+                <div className="text-xs text-gray-400">V</div>
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-green-400">⚡</span>
-                  <span className="text-sm text-gray-300">Total kWh</span>
+                  <span className="text-sm text-gray-300">Total Voltage</span>
                 </div>
                 <div className="text-2xl font-bold">{(energyData.total_generation * 24).toFixed(1)}</div>
-                <div className="text-xs text-gray-400">kWh</div>
+                <div className="text-xs text-gray-400">V</div>
               </div>
             </div>
           </div>
@@ -304,26 +297,12 @@ const Dashboard = () => {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-gray-600 text-sm">Solar</span>
-                <span className="text-gray-900 font-semibold">{energyData.solar_generation} kWh</span>
+                <span className="text-gray-900 font-semibold">{energyData.solar_generation} V</span>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2">
                 <div
                   className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all duration-500"
                   style={{ width: `${(energyData.solar_generation / 10) * 100}%` }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Grid */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-600 text-sm">Grid</span>
-                <span className="text-gray-900 font-semibold">{energyData.grid_import} kWh</span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2">
-                <div
-                  className="bg-gradient-to-r from-yellow-400 to-orange-400 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${(energyData.grid_import / 5) * 100}%` }}
                 ></div>
               </div>
             </div>
@@ -367,7 +346,7 @@ const Dashboard = () => {
               <h3 className="text-lg font-semibold text-gray-900">Energy Production</h3>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-yellow-400">⚡</span>
-                <span className="text-sm text-gray-500">100 kWh</span>
+                <span className="text-sm text-gray-500">100 V</span>
               </div>
             </div>
             <button className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg border border-gray-200">

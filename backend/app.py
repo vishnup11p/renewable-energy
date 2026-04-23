@@ -29,12 +29,9 @@ class EnergyLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     timestamp = db.Column(db.DateTime, nullable=False)
     solar_generation = db.Column(db.Float, default=0)
-    wind_generation = db.Column(db.Float, default=0)
     total_generation = db.Column(db.Float, default=0)
     consumption = db.Column(db.Float, default=0)
     battery_level = db.Column(db.Float, default=50)
-    grid_import = db.Column(db.Float, default=0)
-    grid_export = db.Column(db.Float, default=0)
     efficiency = db.Column(db.Float, default=0)
     temperature = db.Column(db.Float, default=0)
     weather_desc = db.Column(db.String(64), default='Clear')
@@ -97,9 +94,7 @@ def seed_history_data():
             solar = config.solar_capacity * time_factor * cloud_factor * config.panel_efficiency
         else:
             solar = 0.0
-        # Wind Gen
-        wind = 5.0 * random.uniform(0.1, 0.8)
-        total_gen = solar + wind
+        total_gen = solar
         # Consumption
         base_cons = config.consumption_base
         usage_factor = 1.5 if (7 <= hour <= 10 or 18 <= hour <= 21) else 0.8
@@ -108,18 +103,12 @@ def seed_history_data():
         net = total_gen - consumption
         battery_change = (net / config.battery_size) * 100
         battery = max(0, min(100, battery + battery_change))
-        # Grid
-        import_kw = max(0, consumption - total_gen) if battery < 5 else 0
-        export_kw = max(0, total_gen - consumption) if battery > 95 else 0
         log = EnergyLog(
             timestamp=current_time,
             solar_generation=round(solar, 2),
-            wind_generation=round(wind, 2),
             total_generation=round(total_gen, 2),
             consumption=round(consumption, 2),
             battery_level=round(battery, 1),
-            grid_import=round(import_kw, 2),
-            grid_export=round(export_kw, 2),
             efficiency=round(config.panel_efficiency * 100 - max(0, (temp - 25) * 0.5), 1),
             temperature=round(temp, 1),
             weather_desc=weather
@@ -132,10 +121,10 @@ def seed_history_data():
 
 optimization_tips = [
     "Run heavy appliances between 11 AM - 2 PM for maximum solar usage",
-    "Battery is at optimal level. Consider exporting excess to grid",
+    "Battery is at optimal level. Store excess solar power",
     "Weather forecast shows cloudy afternoon. Charge battery now",
     "Peak efficiency detected. Great time for high-power tasks",
-    "Grid rates are high. Switch to battery power for savings"
+    "Switch to battery power after sunset for better savings"
 ]
 
 def calculate_current_state():
@@ -159,9 +148,7 @@ def calculate_current_state():
     solar = config.solar_capacity * sunlight_factor * config.panel_efficiency * random_variation
     solar = max(0, round(solar, 2))
     
-    # Wind Gen
-    wind = round(5.0 * random.uniform(0.1, 0.6), 2)
-    total_gen = round(solar + wind, 2)
+    total_gen = round(solar, 2)
     
     # Consumption
     consumption = round(config.consumption_base * random.uniform(0.8, 1.2), 2)
@@ -174,10 +161,6 @@ def calculate_current_state():
     battery_change = (net_power / config.battery_size) * 0.1 
     new_battery = max(0, min(100, current_battery + battery_change))
     
-    # Grid
-    grid_import = max(0, consumption - total_gen) if total_gen < consumption and new_battery < 5 else 0
-    grid_export = max(0, total_gen - consumption) if total_gen > consumption and new_battery > 95 else 0
-    
     # Efficiency
     temp = weather_data['temperature']
     base_eff = config.panel_efficiency * 100
@@ -187,12 +170,9 @@ def calculate_current_state():
     new_log = EnergyLog(
         timestamp=datetime.now(),
         solar_generation=solar,
-        wind_generation=wind,
         total_generation=total_gen,
         consumption=consumption,
         battery_level=round(new_battery, 1),
-        grid_import=round(grid_import, 2),
-        grid_export=round(grid_export, 2),
         efficiency=eff,
         temperature=temp,
         weather_desc=weather_data['weather']
@@ -223,7 +203,6 @@ def get_energy_data():
     
     data = {
         'solar_generation': log.solar_generation,
-        'wind_generation': log.wind_generation,
         'total_generation': log.total_generation,
         'consumption': log.consumption,
         'battery': log.battery_level,
@@ -234,8 +213,6 @@ def get_energy_data():
         'co2_saved': co2,
         'savings': savings,
         'timestamp': log.timestamp.strftime('%H:%M:%S'),
-        'grid_import': log.grid_import,
-        'grid_export': log.grid_export,
         'panel_voltage': round(random.uniform(380, 420), 1),
         'panel_temperature': round(log.temperature + random.uniform(5, 15), 1),
         'performance_score': perf,
@@ -244,7 +221,6 @@ def get_energy_data():
         'sunlight_level': round(sunlight_factor * 100, 1),
         'clouds': weather_data['clouds'],
         'humidity': weather_data['humidity'],
-        'wind_speed': weather_data['wind_speed'],
         'city': weather_data['city'],
         'weather_icon': get_weather_icon_emoji(weather_data['icon'])
     }
@@ -307,7 +283,6 @@ def get_history_endpoint():
         history_data.append({
             'timestamp': log.timestamp.strftime('%H:%M:%S'),
             'solar_generation': log.solar_generation,
-            'wind_generation': log.wind_generation,
             'total_generation': log.total_generation,
             'consumption': log.consumption,
             'battery': log.battery_level,
@@ -333,10 +308,9 @@ def get_monthly_endpoint():
     for log in logs:
         day_str = log.timestamp.strftime('%Y-%m-%d')
         if day_str not in daily_map:
-            daily_map[day_str] = {'solar': 0, 'wind': 0, 'cons': 0, 'count': 0}
+            daily_map[day_str] = {'solar': 0, 'cons': 0, 'count': 0}
         
         daily_map[day_str]['solar'] += log.solar_generation
-        daily_map[day_str]['wind'] += log.wind_generation
         daily_map[day_str]['cons'] += log.consumption
         daily_map[day_str]['count'] += 1
     
@@ -344,21 +318,14 @@ def get_monthly_endpoint():
     # Sort keys
     for day in sorted(daily_map.keys()):
         d = daily_map[day]
-        # Average power (kW) * 24h = Energy (kWh) approx? 
-        # Actually our logs are hourly in seed, so sum of kW happens to be kWh approximately if sampled hourly.
-        # But if we have multiple samples per hour, we need to average power then multiply by 24?
-        # Let's just assume the sum of samples / samples * 24 roughly.
-        
         avg_solar = d['solar'] / d['count']
-        avg_wind = d['wind'] / d['count']
         avg_cons = d['cons'] / d['count']
         
         monthly_data.append({
             'day': datetime.strptime(day, '%Y-%m-%d').day,
-            'solar': round(avg_solar * 24, 2), # kWh
-            'wind': round(avg_wind * 24, 2),
+            'solar': round(avg_solar * 24, 2),
             'consumption': round(avg_cons * 24, 2),
-            'total': round((avg_solar + avg_wind) * 24, 2)
+            'total': round(avg_solar * 24, 2)
         })
         
     return jsonify(monthly_data)
@@ -375,13 +342,13 @@ def get_optimization_endpoint():
     elif 15 <= hour <= 18:
         tip, priority = "Solar declining. Prepare for evening.", "medium"
     else:
-        tip, priority = "Night time. Minimal grid usage.", "low"
+        tip, priority = "Night time. Keep non-essential loads minimal.", "low"
         
     log = EnergyLog.query.order_by(EnergyLog.timestamp.desc()).first()
     bat = log.battery_level if log else 50
     
     bat_tip = "Battery optimal."
-    if bat > 90: bat_tip = "Battery full. Exporting recommended."
+    if bat > 90: bat_tip = "Battery full. Store available solar for evening use."
     elif bat < 30: bat_tip = "Battery low. Conserve energy."
 
     timeline = [
@@ -417,8 +384,7 @@ def get_prediction_endpoint():
         
         predictions.append({
             'hour': future_time.strftime('%H:00'),
-            'predicted_solar': pred,
-            'predicted_wind': round(random.uniform(1, 4), 2)
+            'predicted_solar': pred
         })
     return jsonify(predictions)
 

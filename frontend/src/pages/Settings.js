@@ -160,7 +160,7 @@ const Settings = () => {
             {/* Battery Size */}
             <div>
               <label className="block text-gray-300 text-sm font-medium mb-2">
-                🔋 Battery Capacity (kWh)
+                🔋 Battery Capacity (V)
               </label>
               <input
                 type="number"

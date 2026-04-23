@@ -91,7 +91,7 @@ const SolarCalculator = () => {
             <form onSubmit={handleCalculate}>
               <div className="mb-6">
                 <label className="block text-gray-300 text-sm font-medium mb-2">
-                  Daily Energy Consumption (kWh)
+                  Daily Energy Reading (V)
                 </label>
                 <input
                   type="number"
@@ -103,7 +103,7 @@ const SolarCalculator = () => {
                   required
                 />
                 <p className="text-gray-500 text-xs mt-2">
-                  Average household: 20-30 kWh/day
+                  Typical system range: 200-350 V/day
                 </p>
               </div>
 
@@ -123,7 +123,7 @@ const SolarCalculator = () => {
                 <li>• System sized for 5 peak sun hours/day</li>
                 <li>• Battery provides 2 days backup</li>
                 <li>• Costs include panels, battery, inverter</li>
-                <li>• Savings based on $0.12/kWh grid rate</li>
+                <li>• Savings based on your local tariff rate</li>
               </ul>
             </div>
           </div>
@@ -157,7 +157,7 @@ const SolarCalculator = () => {
                 <div className="bg-gray-700 rounded-lg p-4">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-300">Battery Capacity</span>
-                    <span className="text-2xl font-bold text-white">{results.battery_capacity_kwh} kWh</span>
+                    <span className="text-2xl font-bold text-white">{results.battery_capacity_kwh} V</span>
                   </div>
                   <p className="text-gray-500 text-xs mt-1">2 days backup</p>
                 </div>
@@ -208,7 +208,7 @@ const SolarCalculator = () => {
               </div>
               <div className="bg-gray-700 rounded-lg p-4">
                 <h4 className="text-gray-300 text-sm mb-2">Battery Storage</h4>
-                <p className="text-white font-semibold">{results.battery_capacity_kwh} kWh capacity</p>
+                <p className="text-white font-semibold">{results.battery_capacity_kwh} V capacity</p>
                 <p className="text-gray-400 text-sm mt-1">Lithium-ion battery bank</p>
               </div>
               <div className="bg-gray-700 rounded-lg p-4">
