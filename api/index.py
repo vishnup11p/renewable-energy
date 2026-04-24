@@ -17,11 +17,12 @@ from weather_service import get_weather, calculate_sunlight_factor, get_weather_
 
 app = Flask(__name__)
 CORS(app)
+LOCKED_CITY = 'Mumbai'
 
 # In-memory storage (replaces SQLite for serverless)
 _storage = {
     'config': {
-        'city': 'Mumbai',
+        'city': LOCKED_CITY,
         'solar_capacity': 10,
         'battery_size': 10,
         'panel_efficiency': 0.85,
@@ -34,12 +35,12 @@ _storage = {
 
 def get_config():
     """Get system configuration."""
+    _storage['config']['city'] = LOCKED_CITY
     return _storage['config']
 
 def update_config(data):
     """Update system configuration."""
-    if 'city' in data:
-        _storage['config']['city'] = data['city']
+    _storage['config']['city'] = LOCKED_CITY
     if 'solar_capacity' in data:
         _storage['config']['solar_capacity'] = float(data['solar_capacity'])
     if 'battery_size' in data:
@@ -213,8 +214,8 @@ def get_energy_data():
         'co2_saved': co2,
         'savings': savings,
         'timestamp': log['timestamp'].strftime('%H:%M:%S'),
-        'panel_voltage': round(random.uniform(380, 420), 1),
-        'panel_temperature': round(log['temperature'] + random.uniform(5, 15), 1),
+        'panel_voltage': round(300 + (log['solar_generation'] * 12), 1),
+        'panel_temperature': round(log['temperature'] + (4 + (sunlight_factor * 8)), 1),
         'performance_score': perf,
         'weather': weather_data['weather'],
         'weather_description': weather_data['description'],
@@ -233,6 +234,7 @@ def get_config_endpoint():
         'success': True,
         'config': {
             'city': config['city'],
+            'location_locked': True,
             'solar_capacity': config['solar_capacity'],
             'battery_size': config['battery_size'],
             'panel_efficiency': config['panel_efficiency'],
@@ -250,7 +252,7 @@ def update_config_endpoint():
 @app.route('/api/weather', methods=['GET'])
 def get_weather_endpoint():
     config = get_config()
-    city = request.args.get('city', config['city'])
+    city = LOCKED_CITY
     
     weather_response = get_weather(city, config.get('weather_api_key'))
     

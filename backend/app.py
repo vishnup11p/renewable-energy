@@ -21,6 +21,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///energy.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 CORS(app)  # Enable CORS for frontend communication
 db = SQLAlchemy(app)
+LOCKED_CITY = 'Mumbai'
 
 
 # --- Models ---
@@ -53,13 +54,16 @@ def get_config_from_db():
     config = SystemConfig.query.first()
     if config is None:
         config = SystemConfig(
-            city='Mumbai',
+            city=LOCKED_CITY,
             solar_capacity=10,
             battery_size=10,
             panel_efficiency=0.85,
             consumption_base=5
         )
         db.session.add(config)
+        db.session.commit()
+    elif config.city != LOCKED_CITY:
+        config.city = LOCKED_CITY
         db.session.commit()
     return config
 
@@ -213,8 +217,8 @@ def get_energy_data():
         'co2_saved': co2,
         'savings': savings,
         'timestamp': log.timestamp.strftime('%H:%M:%S'),
-        'panel_voltage': round(random.uniform(380, 420), 1),
-        'panel_temperature': round(log.temperature + random.uniform(5, 15), 1),
+        'panel_voltage': round(300 + (log.solar_generation * 12), 1),
+        'panel_temperature': round(log.temperature + (4 + (sunlight_factor * 8)), 1),
         'performance_score': perf,
         'weather': weather_data['weather'],
         'weather_description': weather_data['description'],
@@ -233,6 +237,7 @@ def get_config_endpoint():
         'success': True,
         'config': {
             'city': config.city,
+            'location_locked': True,
             'solar_capacity': config.solar_capacity,
             'battery_size': config.battery_size,
             'panel_efficiency': config.panel_efficiency,
@@ -246,7 +251,8 @@ def update_config_endpoint():
     data = request.get_json()
     config = get_config_from_db()
     
-    if 'city' in data: config.city = data['city']
+    # Location is locked to keep weather/simulation consistent.
+    config.city = LOCKED_CITY
     if 'solar_capacity' in data: config.solar_capacity = float(data['solar_capacity'])
     if 'battery_size' in data: config.battery_size = float(data['battery_size'])
     if 'panel_efficiency' in data: config.panel_efficiency = float(data['panel_efficiency'])
@@ -259,7 +265,7 @@ def update_config_endpoint():
 @app.route('/api/weather', methods=['GET'])
 def get_weather_endpoint():
     config = get_config_from_db()
-    city = request.args.get('city', config.city)
+    city = LOCKED_CITY
     
     # Use stored API key
     weather_response = get_weather(city, config.weather_api_key)

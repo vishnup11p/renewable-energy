@@ -26,31 +26,6 @@ const Settings = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  // Popular Indian cities
-  const indianCities = [
-    'Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai',
-    'Kolkata', 'Pune', 'Ahmedabad', 'Jaipur', 'Surat',
-    'Lucknow', 'Kanpur', 'Nagpur', 'Indore', 'Thane',
-    'Bhopal', 'Visakhapatnam', 'Pimpri-Chinchwad', 'Patna', 'Vadodara',
-    'Ghaziabad', 'Ludhiana', 'Agra', 'Nashik', 'Faridabad',
-    'Meerut', 'Rajkot', 'Kalyan-Dombivali', 'Vasai-Virar', 'Varanasi',
-    'Srinagar', 'Aurangabad', 'Dhanbad', 'Amritsar', 'Navi Mumbai',
-    'Allahabad', 'Ranchi', 'Howrah', 'Coimbatore', 'Jabalpur',
-    'Gwalior', 'Vijayawada', 'Jodhpur', 'Madurai', 'Raipur',
-    'Kota', 'Chandigarh', 'Guwahati', 'Solapur', 'Hubli-Dharwad',
-    'Mysore', 'Tiruchirappalli', 'Bareilly', 'Aligarh', 'Tiruppur',
-    'Moradabad', 'Jalandhar', 'Bhubaneswar', 'Salem', 'Warangal',
-    'Mira-Bhayandar', 'Thiruvananthapuram', 'Bhiwandi', 'Saharanpur', 'Guntur',
-    'Amravati', 'Bikaner', 'Noida', 'Jamshedpur', 'Bhilai',
-    'Cuttack', 'Firozabad', 'Kochi', 'Nellore', 'Bhavnagar',
-    'Dehradun', 'Durgapur', 'Asansol', 'Rourkela', 'Nanded',
-    'Kolhapur', 'Ajmer', 'Akola', 'Gulbarga', 'Jamnagar',
-    'Ujjain', 'Loni', 'Siliguri', 'Jhansi', 'Ulhasnagar',
-    'Jammu', 'Sangli-Miraj & Kupwad', 'Mangalore', 'Erode', 'Belgaum',
-    'Ambattur', 'Tirunelveli', 'Malegaon', 'Gaya', 'Jalgaon',
-    'Udaipur', 'Maheshtala', 'Bidar'
-  ].sort();
-
   useEffect(() => {
     fetchConfig();
   }, []);
@@ -128,16 +103,13 @@ const Settings = () => {
               <label className="block text-gray-300 text-sm font-medium mb-2">
                 📍 City Location
               </label>
-              <select
+              <input
+                type="text"
                 value={systemConfig.city}
-                onChange={(e) => handleConfigChange('city', e.target.value)}
-                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 transition"
-              >
-                {indianCities.map(city => (
-                  <option key={city} value={city}>{city}</option>
-                ))}
-              </select>
-              <p className="text-gray-500 text-xs mt-1">Real-time weather data will be fetched for this city</p>
+                disabled
+                className="w-full px-4 py-3 bg-gray-800/30 border border-gray-700 rounded-xl text-gray-300 cursor-not-allowed"
+              />
+              <p className="text-gray-500 text-xs mt-1">Location is locked for stable simulation data</p>
             </div>
 
             {/* Solar Capacity */}
