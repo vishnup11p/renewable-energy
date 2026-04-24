@@ -20,8 +20,10 @@ const Settings = () => {
     solar_capacity: 10,
     battery_size: 10,
     panel_efficiency: 0.85,
-    consumption_base: 5
+    consumption_base: 5,
+    simulation_enabled: false
   });
+
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -106,11 +108,13 @@ const Settings = () => {
               <input
                 type="text"
                 value={systemConfig.city}
-                disabled
-                className="w-full px-4 py-3 bg-gray-800/30 border border-gray-700 rounded-xl text-gray-300 cursor-not-allowed"
+                onChange={(e) => handleConfigChange('city', e.target.value)}
+                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 transition"
+                placeholder="Enter city name..."
               />
-              <p className="text-gray-500 text-xs mt-1">Location is locked for stable simulation data</p>
+              <p className="text-gray-500 text-xs mt-1">Change city to get local weather data</p>
             </div>
+
 
             {/* Solar Capacity */}
             <div>
@@ -179,7 +183,28 @@ const Settings = () => {
               />
               <p className="text-gray-500 text-xs mt-1">Average household consumption</p>
             </div>
+
+            {/* Simulation Toggle */}
+            <div className="flex items-center justify-between p-4 bg-gray-800/30 border border-gray-700 rounded-xl mt-2">
+              <div>
+                <p className="text-white font-medium">Real-time Simulation</p>
+                <p className="text-gray-400 text-xs">Enable auto-generated energy data</p>
+              </div>
+              <button
+                onClick={() => handleConfigChange('simulation_enabled', !systemConfig.simulation_enabled)}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
+                  systemConfig.simulation_enabled ? 'bg-yellow-500' : 'bg-gray-600'
+                }`}
+              >
+                <div
+                  className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${
+                    systemConfig.simulation_enabled ? 'transform translate-x-6' : ''
+                  }`}
+                ></div>
+              </button>
+            </div>
           </div>
+
 
           {/* Save Button */}
           <div className="mt-6 flex justify-end">

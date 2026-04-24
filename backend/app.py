@@ -21,7 +21,8 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///energy.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 CORS(app)  # Enable CORS for frontend communication
 db = SQLAlchemy(app)
-LOCKED_CITY = 'Mumbai'
+# LOCKED_CITY = 'Mumbai' # Removed as per user request
+
 
 
 # --- Models ---
@@ -47,6 +48,8 @@ class SystemConfig(db.Model):
     panel_efficiency = db.Column(db.Float, default=0.85)
     consumption_base = db.Column(db.Float, default=5)
     weather_api_key = db.Column(db.String(256), default=None)
+    simulation_enabled = db.Column(db.Boolean, default=False)
+
 
 
 def get_config_from_db():
@@ -54,18 +57,17 @@ def get_config_from_db():
     config = SystemConfig.query.first()
     if config is None:
         config = SystemConfig(
-            city=LOCKED_CITY,
+            city='Mumbai', # Default to Mumbai but allow change
             solar_capacity=10,
             battery_size=10,
             panel_efficiency=0.85,
-            consumption_base=5
+            consumption_base=5,
+            simulation_enabled=False
         )
         db.session.add(config)
         db.session.commit()
-    elif config.city != LOCKED_CITY:
-        config.city = LOCKED_CITY
-        db.session.commit()
     return config
+
 
 
 def seed_history_data():
@@ -147,7 +149,26 @@ def calculate_current_state():
     
     sunlight_factor = calculate_sunlight_factor(weather_data)
     
+    if not config.simulation_enabled:
+        # Simulation is off: Show all data zero as requested
+        new_log = EnergyLog(
+            timestamp=datetime.now(),
+            solar_generation=0,
+            total_generation=0,
+            consumption=0,
+            battery_level=0,
+            efficiency=0,
+            temperature=weather_data['temperature'],
+            weather_desc=weather_data['weather']
+        )
+        # We still save logs to keep history, but they are zeroed.
+        # Alternatively, we could not save. Let's save zeros for consistency.
+        db.session.add(new_log)
+        db.session.commit()
+        return new_log, weather_data, sunlight_factor
+
     # Solar Gen
+
     random_variation = random.uniform(0.95, 1.05)
     solar = config.solar_capacity * sunlight_factor * config.panel_efficiency * random_variation
     solar = max(0, round(solar, 2))
@@ -237,13 +258,15 @@ def get_config_endpoint():
         'success': True,
         'config': {
             'city': config.city,
-            'location_locked': True,
+            'location_locked': False,
             'solar_capacity': config.solar_capacity,
             'battery_size': config.battery_size,
             'panel_efficiency': config.panel_efficiency,
             'consumption_base': config.consumption_base,
-            'weather_api_key': config.weather_api_key or ''
+            'weather_api_key': config.weather_api_key or '',
+            'simulation_enabled': config.simulation_enabled
         }
+
     })
 
 @app.route('/api/config', methods=['POST'])
@@ -251,13 +274,15 @@ def update_config_endpoint():
     data = request.get_json()
     config = get_config_from_db()
     
-    # Location is locked to keep weather/simulation consistent.
-    config.city = LOCKED_CITY
+    # Location is no longer locked.
+    if 'city' in data: config.city = data['city']
     if 'solar_capacity' in data: config.solar_capacity = float(data['solar_capacity'])
     if 'battery_size' in data: config.battery_size = float(data['battery_size'])
     if 'panel_efficiency' in data: config.panel_efficiency = float(data['panel_efficiency'])
     if 'consumption_base' in data: config.consumption_base = float(data['consumption_base'])
     if 'weather_api_key' in data: config.weather_api_key = data['weather_api_key']
+    if 'simulation_enabled' in data: config.simulation_enabled = bool(data['simulation_enabled'])
+
     
     db.session.commit()
     return jsonify({'success': True, 'message': 'Configuration updated successfully'})
@@ -265,7 +290,8 @@ def update_config_endpoint():
 @app.route('/api/weather', methods=['GET'])
 def get_weather_endpoint():
     config = get_config_from_db()
-    city = LOCKED_CITY
+    city = config.city
+
     
     # Use stored API key
     weather_response = get_weather(city, config.weather_api_key)
