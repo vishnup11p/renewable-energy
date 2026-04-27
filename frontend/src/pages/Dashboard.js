@@ -81,11 +81,11 @@ const Dashboard = () => {
 
   // Prepare chart data for energy production
   const chartData = {
-    labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15'],
+    labels: history.length > 0 ? history.slice(-15).map(h => h.timestamp) : ['00:00'],
     datasets: [
       {
         label: 'Solar',
-        data: [180, 200, 410, 420, 460, 480, 550, 580, 470, 490, 520, 560, 590, 620, 650],
+        data: history.length > 0 ? history.slice(-15).map(h => h.total_generation) : [0],
         backgroundColor: '#f97316',
         borderRadius: 4,
         barThickness: 12

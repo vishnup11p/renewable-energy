@@ -12,16 +12,14 @@ const Sidebar = () => {
 
   const menuItems = [
     { path: '/', icon: '📊', label: 'Overview', section: 'DASHBOARD' },
+    { path: '/iot-dashboard', icon: '📡', label: 'IoT Monitor', section: 'DASHBOARD' },
     { path: '/analytics', icon: '📈', label: 'Analytics', section: 'DASHBOARD' },
-    { path: '/optimization', icon: '⚖️', label: 'Energy Balance', section: 'DASHBOARD' },
-    { path: '/reports', icon: '📄', label: 'Report', section: 'DASHBOARD' },
-    { path: '/calculator', icon: '⚙️', label: 'Service Message', section: 'DASHBOARD' }
+    { path: '/reports', icon: '📄', label: 'Report', section: 'DASHBOARD' }
   ];
 
   const settingsItems = [
-    { path: '/settings', icon: '🏠', label: 'My Site' },
-    { path: '/settings', icon: '👤', label: 'My Account' },
-    { path: '/settings', icon: '❓', label: 'Support' }
+    { path: '/settings', icon: '⚙️', label: 'Settings' },
+    { path: '/', icon: '❓', label: 'Support' }
   ];
 
   const handleLogout = () => {

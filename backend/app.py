@@ -111,11 +111,11 @@ def seed_history_data():
         battery = max(0, min(100, battery + battery_change))
         log = EnergyLog(
             timestamp=current_time,
-            solar_generation=round(solar, 2),
-            total_generation=round(total_gen, 2),
-            consumption=round(consumption, 2),
-            battery_level=round(battery, 1),
-            efficiency=round(config.panel_efficiency * 100 - max(0, (temp - 25) * 0.5), 1),
+            solar_generation=0,
+            total_generation=0,
+            consumption=0,
+            battery_level=0,
+            efficiency=0,
             temperature=round(temp, 1),
             weather_desc=weather
         )
@@ -149,57 +149,15 @@ def calculate_current_state():
     
     sunlight_factor = calculate_sunlight_factor(weather_data)
     
-    if not config.simulation_enabled:
-        # Simulation is off: Show all data zero as requested
-        new_log = EnergyLog(
-            timestamp=datetime.now(),
-            solar_generation=0,
-            total_generation=0,
-            consumption=0,
-            battery_level=0,
-            efficiency=0,
-            temperature=weather_data['temperature'],
-            weather_desc=weather_data['weather']
-        )
-        # We still save logs to keep history, but they are zeroed.
-        # Alternatively, we could not save. Let's save zeros for consistency.
-        db.session.add(new_log)
-        db.session.commit()
-        return new_log, weather_data, sunlight_factor
-
-    # Solar Gen
-
-    random_variation = random.uniform(0.95, 1.05)
-    solar = config.solar_capacity * sunlight_factor * config.panel_efficiency * random_variation
-    solar = max(0, round(solar, 2))
-    
-    total_gen = round(solar, 2)
-    
-    # Consumption
-    consumption = round(config.consumption_base * random.uniform(0.8, 1.2), 2)
-    
-    # Battery Update
-    net_power = total_gen - consumption
-    # Simulate 5% capacity change per hour equivalent update (since we update every few secs, this logic is simplified for realtime feel)
-    # Ideally should be: (net_power / capacity) * (time_delta_in_hours)
-    # We'll just nudge it slightly for the realtime effect
-    battery_change = (net_power / config.battery_size) * 0.1 
-    new_battery = max(0, min(100, current_battery + battery_change))
-    
-    # Efficiency
-    temp = weather_data['temperature']
-    base_eff = config.panel_efficiency * 100
-    eff = round(base_eff - max(0, (temp - 25) * 0.5), 1)
-    
-    # Create Log
+    # Forced zero data as requested by user (Simulation Removed)
     new_log = EnergyLog(
         timestamp=datetime.now(),
-        solar_generation=solar,
-        total_generation=total_gen,
-        consumption=consumption,
-        battery_level=round(new_battery, 1),
-        efficiency=eff,
-        temperature=temp,
+        solar_generation=0,
+        total_generation=0,
+        consumption=0,
+        battery_level=0,
+        efficiency=0,
+        temperature=weather_data['temperature'],
         weather_desc=weather_data['weather']
     )
     db.session.add(new_log)
@@ -448,6 +406,46 @@ def login_endpoint():
     if data.get('username') == 'admin' and data.get('password') == 'admin123':
         return jsonify({'success': True, 'token': 'demo-token'})
     return jsonify({'success': False}), 401
+
+# IoT Data memory storage
+iot_data = {
+    'voltage': 0,
+    'timestamp': 0,
+    'history': []
+}
+
+@app.route('/api/solar', methods=['GET', 'POST'])
+def iot_solar_endpoint():
+    """IoT Solar endpoint for ESP32 data collection and dashboard retrieval"""
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+            voltage = float(data.get('voltage', 0))
+            timestamp = data.get('timestamp', 0)
+            
+            # Update latest data
+            iot_data['voltage'] = voltage
+            iot_data['timestamp'] = timestamp
+            
+            # Add to history
+            history_point = {
+                'voltage': voltage,
+                'time': datetime.now().strftime('%H:%M:%S')
+            }
+            iot_data['history'].append(history_point)
+            if len(iot_data['history']) > 50:
+                iot_data['history'] = iot_data['history'][-50:]
+                
+            return jsonify({'success': True})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 400
+            
+    else: # GET request
+        return jsonify({
+            'voltage': iot_data['voltage'],
+            'status': 'Charging' if iot_data['voltage'] > 2.0 else 'Idle',
+            'history': iot_data['history']
+        })
 
 # --- Init ---
 

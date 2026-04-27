@@ -13,6 +13,7 @@ import Analytics from './pages/Analytics';
 import Optimization from './pages/Optimization';
 import SolarCalculator from './pages/SolarCalculator';
 import Reports from './pages/Reports';
+import IoTDashboard from './pages/IoTDashboard';
 import Settings from './pages/Settings';
 
 function App() {
@@ -75,6 +76,14 @@ function App() {
           element={
             <ProtectedRoute>
               <SolarCalculator />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/iot-dashboard"
+          element={
+            <ProtectedRoute>
+              <IoTDashboard />
             </ProtectedRoute>
           }
         />
