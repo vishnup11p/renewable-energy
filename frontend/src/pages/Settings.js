@@ -7,6 +7,39 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import API_BASE_URL from '../config/api';
 
+const INDIAN_CITIES = [
+  "Mumbai", "Delhi", "Bengaluru", "Hyderabad", "Ahmedabad", "Chennai", "Kolkata", 
+  "Surat", "Pune", "Jaipur", "Lucknow", "Kanpur", "Nagpur", "Indore", "Thane", 
+  "Bhopal", "Visakhapatnam", "Pimpri-Chinchwad", "Patna", "Vadodara", "Ghaziabad", 
+  "Ludhiana", "Agra", "Nashik", "Faridabad", "Meerut", "Rajkot", "Kalyan-Dombivli", 
+  "Vasai-Virar", "Varanasi", "Srinagar", "Aurangabad", "Dhanbad", "Amritsar", 
+  "Navi Mumbai", "Prayagraj", "Howrah", "Ranchi", "Gwalior", "Jabalpur", 
+  "Coimbatore", "Vijayawada", "Jodhpur", "Madurai", "Raipur", "Chandigarh", 
+  "Guntur", "Guwahati", "Solapur", "Hubli-Dharwad", "Mysore", "Tiruppur", 
+  "Gurgaon", "Noida", "Bhubaneswar", "Salem", "Warangal", "Thiruvananthapuram", 
+  "Bhiwandi", "Saharanpur", "Amravati", "Jamshedpur", "Bhilai", "Cuttack", 
+  "Kochi", "Udaipur", "Dehradun", "Bidar", "Amaravati", "Ajmer", "Akola", "Gulbarga", 
+  "Jamnagar", "Ujjain", "Loni", "Siliguri", "Jhansi", "Ulhasnagar", "Jammu", 
+  "Sangli", "Mangalore", "Erode", "Belgaum", "Kurnool", "Ambattur", "Gaya", 
+  "Tirunelveli", "Malappuram", "Davanagere", "Kozhikode", "Bokaro", "Bellary", 
+  "Patiala", "Bhagalpur", "Jalna", "Muzaffarpur", "Latur", "Dhule", "Rohtak", 
+  "Sagar", "Korba", "Bhilwara", "Berhampur", "Muzaffarnagar", "Ahmednagar", 
+  "Mathura", "Kollam", "Avadi", "Kadapa", "Kamarhati", "Sambalpur", "Bilaspur", 
+  "Shahjahanpur", "Satara", "Bijapur", "Rampur", "Shimoga", "Chandrapur", 
+  "Junagadh", "Thrissur", "Alwar", "Bardhaman", "Kakinada", "Nizamabad", "Parbhani", 
+  "Tumkur", "Khammam", "Bihar Sharif", "Panvel", "Darbhanga", "Aizawl", "Dewas", 
+  "Ichalkaranji", "Karnal", "Bathinda", "Eluru", "Barasat", "Purnia", "Satna", 
+  "Mau", "Sonipat", "Farrukhabad", "Durg", "Imphal", "Ratlam", "Hapur", "Arrah", 
+  "Anantapur", "Karimnagar", "Etawah", "Ambernath", "Bharatpur", "Begusarai", 
+  "New Delhi", "Gandhidham", "Baranagar", "Puducherry", "Sikar", "Thoothukudi", 
+  "Rewa", "Mirzapur", "Raichur", "Pali", "Ramagundam", "Silchar", "Haridwar", 
+  "Vijayanagaram", "Tenali", "Nagercoil", "Sri Ganganagar", "Thanjavur", 
+  "Bulandshahr", "Uluberia", "Katni", "Singrauli", "Nadiad", "Yamunanagar", 
+  "Bidhannagar", "Pallavaram", "Munger", "Panchkula", "Burhanpur", "Kharagpur", 
+  "Dindigul", "Gandhinagar", "Hospet", "Malda", "Ongole", "Deoghar", "Chapra", 
+  "Haldia", "Khandwa", "Nandyal", "Morena", "Amroha", "Anand", "Bhind"
+].sort();
+
 const Settings = () => {
   const [settings, setSettings] = useState({
     notifications: true,
@@ -99,109 +132,24 @@ const Settings = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6">
             {/* City Selection */}
             <div>
               <label className="block text-gray-300 text-sm font-medium mb-2">
                 📍 City Location
               </label>
-              <input
-                type="text"
+              <select
                 value={systemConfig.city}
                 onChange={(e) => handleConfigChange('city', e.target.value)}
                 className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 transition"
-                placeholder="Enter city name..."
-              />
-              <p className="text-gray-500 text-xs mt-1">Change city to get local weather data</p>
-            </div>
-
-
-            {/* Solar Capacity */}
-            <div>
-              <label className="block text-gray-300 text-sm font-medium mb-2">
-                ☀️ Solar Capacity (kW)
-              </label>
-              <input
-                type="number"
-                step="0.5"
-                min="1"
-                max="100"
-                value={systemConfig.solar_capacity}
-                onChange={(e) => handleConfigChange('solar_capacity', parseFloat(e.target.value))}
-                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 transition"
-              />
-              <p className="text-gray-500 text-xs mt-1">Total installed solar panel capacity</p>
-            </div>
-
-            {/* Battery Size */}
-            <div>
-              <label className="block text-gray-300 text-sm font-medium mb-2">
-                🔋 Battery Capacity (V)
-              </label>
-              <input
-                type="number"
-                step="1"
-                min="5"
-                max="50"
-                value={systemConfig.battery_size}
-                onChange={(e) => handleConfigChange('battery_size', parseFloat(e.target.value))}
-                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 transition"
-              />
-              <p className="text-gray-500 text-xs mt-1">Battery storage capacity</p>
-            </div>
-
-            {/* Panel Efficiency */}
-            <div>
-              <label className="block text-gray-300 text-sm font-medium mb-2">
-                ⚡ Panel Efficiency (%)
-              </label>
-              <input
-                type="number"
-                step="1"
-                min="70"
-                max="95"
-                value={Math.round(systemConfig.panel_efficiency * 100)}
-                onChange={(e) => handleConfigChange('panel_efficiency', parseFloat(e.target.value) / 100)}
-                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 transition"
-              />
-              <p className="text-gray-500 text-xs mt-1">Solar panel conversion efficiency</p>
-            </div>
-
-            {/* Base Consumption */}
-            <div>
-              <label className="block text-gray-300 text-sm font-medium mb-2">
-                🏠 Base Consumption (kW)
-              </label>
-              <input
-                type="number"
-                step="0.5"
-                min="1"
-                max="20"
-                value={systemConfig.consumption_base}
-                onChange={(e) => handleConfigChange('consumption_base', parseFloat(e.target.value))}
-                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 transition"
-              />
-              <p className="text-gray-500 text-xs mt-1">Average household consumption</p>
-            </div>
-
-            {/* Simulation Toggle */}
-            <div className="flex items-center justify-between p-4 bg-gray-800/30 border border-gray-700 rounded-xl mt-2">
-              <div>
-                <p className="text-white font-medium">Real-time Simulation</p>
-                <p className="text-gray-400 text-xs">Enable auto-generated energy data</p>
-              </div>
-              <button
-                onClick={() => handleConfigChange('simulation_enabled', !systemConfig.simulation_enabled)}
-                className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${
-                  systemConfig.simulation_enabled ? 'bg-yellow-500' : 'bg-gray-600'
-                }`}
               >
-                <div
-                  className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${
-                    systemConfig.simulation_enabled ? 'transform translate-x-6' : ''
-                  }`}
-                ></div>
-              </button>
+                {INDIAN_CITIES.map(city => (
+                  <option key={city} value={city} className="bg-gray-900 text-white border-0">
+                    {city}
+                  </option>
+                ))}
+              </select>
+              <p className="text-gray-500 text-xs mt-2">Selecting a different city will update the local weather monitoring.</p>
             </div>
           </div>
 

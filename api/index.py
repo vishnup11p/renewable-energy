@@ -30,6 +30,11 @@ _storage = {
         'weather_api_key': None
     },
     'energy_logs': [],
+    'iot_data': {
+        'voltage': 0,
+        'timestamp': 0,
+        'history': []
+    },
     'initialized': False
 }
 
@@ -397,6 +402,39 @@ def login_endpoint():
     if data.get('username') == 'admin' and data.get('password') == 'admin123':
         return jsonify({'success': True, 'token': 'demo-token'})
     return jsonify({'success': False}), 401
+
+@app.route('/api/solar', methods=['GET', 'POST'])
+def iot_solar_endpoint():
+    """IoT Solar endpoint for ESP32 data collection and dashboard retrieval"""
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+            voltage = float(data.get('voltage', 0))
+            timestamp = data.get('timestamp', 0)
+            
+            # Update latest data
+            _storage['iot_data']['voltage'] = voltage
+            _storage['iot_data']['timestamp'] = timestamp
+            
+            # Add to history (keep last 50 points)
+            history_point = {
+                'voltage': voltage,
+                'time': datetime.now().strftime('%H:%M:%S')
+            }
+            _storage['iot_data']['history'].append(history_point)
+            if len(_storage['iot_data']['history']) > 50:
+                _storage['iot_data']['history'] = _storage['iot_data']['history'][-50:]
+                
+            return jsonify({'success': True})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 400
+            
+    else: # GET request
+        return jsonify({
+            'voltage': _storage['iot_data']['voltage'],
+            'status': 'Charging' if _storage['iot_data']['voltage'] > 2.0 else 'Idle',
+            'history': _storage['iot_data']['history']
+        })
 
 # Export Flask app for Vercel
 # Vercel automatically detects Flask apps when 'app' is exported
